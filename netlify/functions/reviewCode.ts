@@ -83,8 +83,8 @@ const handler: Handler = async (event: HandlerEvent) => {
       };
     }
     
-    if (!process.env.API_KEY) {
-        console.error("API_KEY environment variable not set in Netlify.");
+    if (!process.env.GEMINI_API_KEY) {
+        console.error("GEMINI_API_KEY environment variable not set in Netlify.");
         return {
             statusCode: 500,
             body: JSON.stringify({ error: "Server configuration error. The API key is missing." }),
@@ -95,7 +95,7 @@ const handler: Handler = async (event: HandlerEvent) => {
     const prompt = getPrompt(files, language);
 
     // 1. Selecciona el modelo
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-latest' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
     // 2. Llama a la API usando el 'model' y el 'prompt'
     const result = await model.generateContent(prompt);
