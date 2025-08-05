@@ -27,29 +27,50 @@ const LoadingSkeleton: React.FC = () => (
 );
 
 const FormattedReview: React.FC<{ content: string }> = ({ content }) => {
-    const lines = content.split('\n');
+    const parts = content.split(/(```[\s\S]*?```)/g);
+
     return (
         <div className="prose prose-invert prose-sm md:prose-base max-w-none text-gray-300">
-          {lines.map((line, index) => {
-            const trimmedLine = line.trim();
-            if (trimmedLine.startsWith('### ')) {
-              return <h3 key={index} className="text-xl font-semibold text-white mt-6 mb-2 border-b border-gray-600 pb-1">{trimmedLine.substring(4)}</h3>;
-            }
-            if (trimmedLine.startsWith('#### ')) {
-              return <h4 key={index} className="text-lg font-semibold text-indigo-400 mt-4 mb-1">{trimmedLine.substring(5)}</h4>;
-            }
-            if (trimmedLine.startsWith('- ') || trimmedLine.startsWith('* ')) {
-              return <li key={index} className="ml-5 list-disc">{trimmedLine.substring(2)}</li>;
-            }
-            if (trimmedLine === '') {
-              return null;
-            }
-            return <p key={index}>{trimmedLine}</p>;
-          })}
+            {parts.map((part, index) => {
+                if (part.startsWith('```')) {
+                    const code = part.replace(/```/g, '').trim();
+                    return (
+                        <pre key={index} className="bg-gray-900/70 border border-gray-700 rounded-md p-4 text-sm overflow-x-auto">
+                            <code>{code}</code>
+                        </pre>
+                    );
+                }
+
+                const lines = part.trim().split('\n');
+                let isList = false;
+                const elements: React.ReactNode[] = [];
+
+                for (let i = 0; i < lines.length; i++) {
+                    const line = lines[i].trim();
+                    if (line.startsWith('### ')) {
+                        elements.push(<h3 key={`${index}-${i}`} className="text-xl font-semibold text-white mt-6 mb-2 border-b border-gray-600 pb-1">{line.substring(4)}</h3>);
+                        isList = false;
+                    } else if (line.startsWith('#### ')) {
+                        elements.push(<h4 key={`${index}-${i}`} className="text-lg font-semibold text-indigo-400 mt-4 mb-1">{line.substring(5)}</h4>);
+                        isList = false;
+                    } else if (line.startsWith('- ') || line.startsWith('* ')) {
+                        if (!isList) {
+                            elements.push(<ul key={`${index}-${i}-ul`} className="list-disc pl-5 space-y-1"></ul>);
+                            isList = true;
+                        }
+                        const listContainer = elements[elements.length - 1] as React.ReactElement;
+                        const newChildren = [...React.Children.toArray(listContainer.props.children), <li key={`${index}-${i}`}>{line.substring(2)}</li>];
+                        elements[elements.length - 1] = React.cloneElement(listContainer, {}, newChildren);
+                    } else if (line) {
+                        elements.push(<p key={`${index}-${i}`}>{line}</p>);
+                        isList = false;
+                    }
+                }
+                return <React.Fragment key={index}>{elements}</React.Fragment>;
+            })}
         </div>
     );
 };
-
 
 export const ReviewOutput: React.FC<ReviewOutputProps> = ({ review, isLoading, error, text }) => {
   return (

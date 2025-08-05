@@ -1,6 +1,6 @@
 
 import { GoogleGenAI } from "@google/genai";
-import type { HandlerEvent } from "@netlify/functions";
+import type { Context } from "@netlify/functions";
 
 type Language = 'en' | 'es';
 interface CodeFile {
@@ -38,7 +38,7 @@ ${codeBlocks}
 
 **Output Format:**
 
-Structure your response with the following Markdown headings. Use bullet points for lists.
+Structure your response with the following Markdown headings. Use bullet points for lists. Use fenced code blocks for code examples.
 
 ### Overall Score (out of 100)
 A single score reflecting overall compliance with the principles.
@@ -66,8 +66,8 @@ If applicable, suggest how client-side AI could be compliantly and performantly 
 `;
 };
 
-const handler = async (event: HandlerEvent) => {
-  if (event.httpMethod !== 'POST') {
+export default async (request: Request, context: Context) => {
+  if (request.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'Method Not Allowed' }), {
       status: 405,
       headers: { 'Content-Type': 'application/json' },
@@ -83,7 +83,7 @@ const handler = async (event: HandlerEvent) => {
   }
 
   try {
-    const { files, language } = JSON.parse(event.body || '{}');
+    const { files, language } = await request.json();
 
     if (!files || !Array.isArray(files) || files.length === 0 || !language) {
        return new Response(JSON.stringify({ error: 'Missing files or language in request body.' }), {
@@ -132,5 +132,3 @@ const handler = async (event: HandlerEvent) => {
     });
   }
 };
-
-export { handler };
