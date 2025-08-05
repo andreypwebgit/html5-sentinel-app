@@ -74,8 +74,8 @@ const handler = async (event: HandlerEvent) => {
     });
   }
   
-  if (!process.env.API_KEY) {
-      console.error("API_KEY environment variable not set in Netlify.");
+  if (!process.env.GEMINI_API_KEY) {
+      console.error("GEMINI_API_KEY environment variable not set in Netlify.");
       return new Response(JSON.stringify({ error: "Server configuration error. The API key is missing." }), {
           status: 500,
           headers: { 'Content-Type': 'application/json' },
@@ -92,7 +92,7 @@ const handler = async (event: HandlerEvent) => {
       });
     }
     
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
     const prompt = getPrompt(files, language);
 
     const stream = new ReadableStream({
