@@ -95,7 +95,7 @@ const handler: Handler = async (event: HandlerEvent) => {
     const prompt = getPrompt(files, language);
 
     // 1. Selecciona el modelo
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-latest' });
 
     // 2. Llama a la API usando el 'model' y el 'prompt'
     const result = await model.generateContent(prompt);
