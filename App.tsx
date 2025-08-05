@@ -8,8 +8,6 @@ import { reviewCodeStream, type ChatContent } from './services/geminiService';
 import type { Language, CodeFile } from './types';
 import { UI_TEXT } from './constants';
 
-// This helper function constructs the initial prompt. It's duplicated from the
-// backend to allow the client to build the initial chat history.
 const getInitialUserPrompt = (files: CodeFile[], language: Language): string => {
   const lang_prompt = language === 'es' ? 'español' : 'inglés';
   const codeBlocks = files.map(file => `
@@ -78,14 +76,19 @@ export default function App() {
             },
             onError: (err) => {
                 setError(err.message);
+                setIsLoading(false);
             },
             onFinish: (truncated) => {
                 setIsLoading(false);
                 setIsTruncated(truncated);
+                
+                const finalModelResponse = reviewRef.current.replace('__STREAM_TRUNCATED__', '');
+                setReview(finalModelResponse);
+
                 const userPrompt = getInitialUserPrompt(files, language);
                 const newHistory: ChatContent[] = [
                     { role: 'user', parts: [{ text: userPrompt }] },
-                    { role: 'model', parts: [{ text: reviewRef.current }] },
+                    { role: 'model', parts: [{ text: finalModelResponse }] },
                 ];
                 setHistory(newHistory);
             },
@@ -100,7 +103,7 @@ export default function App() {
     setError(null);
     setIsTruncated(false);
 
-    const continueHistory: ChatContent[] = [
+    const historyForApiCall: ChatContent[] = [
         ...history,
         { role: 'user', parts: [{ text: 'Please continue generating the response from exactly where you left off. Do not repeat anything or add conversational filler.' }] }
     ];
@@ -108,7 +111,7 @@ export default function App() {
     const newContentRef = useRef('');
 
     await reviewCodeStream({
-        history: continueHistory,
+        history: historyForApiCall,
         callbacks: {
             onChunk: (chunk) => {
                 newContentRef.current += chunk;
@@ -116,17 +119,34 @@ export default function App() {
             },
             onError: (err) => {
                 setError(err.message);
+                setIsLoading(false);
             },
             onFinish: (truncated) => {
                 setIsLoading(false);
                 setIsTruncated(truncated);
+                
+                const cleanedNewContent = newContentRef.current.replace('__STREAM_TRUNCATED__', '');
 
-                // Correctly append the new model response to the history
-                const finalHistory: ChatContent[] = [
-                    ...continueHistory,
-                    { role: 'model', parts: [{ text: newContentRef.current }] }
-                ];
-                setHistory(finalHistory);
+                setReview(prev => prev.replace('__STREAM_TRUNCATED__', ''));
+                
+                const updatedHistory = [...history];
+                
+                let lastModelMessageIndex = -1;
+                for (let i = updatedHistory.length - 1; i >= 0; i--) {
+                    if (updatedHistory[i].role === 'model') {
+                        lastModelMessageIndex = i;
+                        break;
+                    }
+                }
+
+                if (lastModelMessageIndex !== -1) {
+                    const originalModelMessage = updatedHistory[lastModelMessageIndex].parts[0].text;
+                    updatedHistory[lastModelMessageIndex] = {
+                        role: 'model',
+                        parts: [{ text: originalModelMessage + cleanedNewContent }]
+                    };
+                    setHistory(updatedHistory);
+                }
             }
         }
     });
