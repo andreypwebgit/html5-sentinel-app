@@ -1,8 +1,12 @@
-import { GoogleGenAI } from "@google/genai";
+// Archivo: reviewCode.ts
+
+// Importación corregida desde el paquete oficial
+import { GoogleGenerativeAI } from "@google/generative-ai"; 
 import type { Handler, HandlerEvent } from "@netlify/functions";
 
 type Language = 'en' | 'es';
 
+// Tu función getPrompt() se mantiene exactamente igual...
 const getPrompt = (code: string, language: Language): string => {
   const lang_prompt = language === 'es' ? 'español' : 'inglés';
   
@@ -54,6 +58,7 @@ If applicable, suggest how client-side AI could be compliantly and performantly 
 `;
 };
 
+
 const handler: Handler = async (event: HandlerEvent) => {
   if (event.httpMethod !== 'POST') {
     return {
@@ -72,26 +77,28 @@ const handler: Handler = async (event: HandlerEvent) => {
       };
     }
     
-    if (!process.env.API_KEY) {
-        console.error("API_KEY environment variable not set in Netlify.");
+    // CORRECCIÓN 2: El nombre de la variable de entorno debe coincidir
+    // con la que configuras en Netlify. Usaré GEMINI_API_KEY para ser consistente.
+    if (!process.env.GEMINI_API_KEY) {
+        console.error("GEMINI_API_KEY environment variable not set in Netlify.");
         return {
             statusCode: 500,
             body: JSON.stringify({ error: "Server configuration error. The API key is missing." }),
         };
     }
 
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const prompt = getPrompt(code, language);
+    // CORRECCIÓN 3: Uso correcto del SDK
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" }); // Nombre del modelo corregido
+    const prompt = getPrompt(code, language as Language);
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: prompt,
-    });
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
 
     return {
       statusCode: 200,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ review: response.text }),
+      body: JSON.stringify({ review: response.text() }), // Llamada a .text()
     };
 
   } catch (error) {

@@ -4,6 +4,7 @@
   "private": true,
   "dependencies": {
     "@google/genai": "^1.12.0",
+    "@google/generative-ai": "^0.24.1",
     "@netlify/functions": "^4.2.1"
   }
 }
