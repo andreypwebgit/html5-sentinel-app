@@ -8,6 +8,8 @@ interface ReviewOutputProps {
   text: {
     reviewTitle: string;
   };
+  isTruncated: boolean;
+  onContinue: () => void;
 }
 
 const LoadingSkeleton: React.FC = () => (
@@ -89,20 +91,32 @@ const FormattedReview: React.FC<{ content: string }> = ({ content }) => {
     );
 };
 
-export const ReviewOutput: React.FC<ReviewOutputProps> = ({ review, isLoading, error, text }) => {
+export const ReviewOutput: React.FC<ReviewOutputProps> = ({ review, isLoading, error, text, isTruncated, onContinue }) => {
   return (
     <div className="bg-gray-800 rounded-lg shadow-lg p-6 flex flex-col h-full">
       <h2 className="text-xl font-bold text-white mb-4">{text.reviewTitle}</h2>
-      <div className="flex-grow bg-gray-900 border border-gray-700 rounded-md p-4 overflow-y-auto">
-        {isLoading && !review && !error && <LoadingSkeleton />}
-        {error && <div className="text-red-400 p-4 bg-red-900/50 rounded-md">{error}</div>}
-        {review && <FormattedReview content={review} />}
-        {!isLoading && !error && !review && (
-          <div className="flex items-center justify-center h-full text-gray-500">
-            Your analysis report will appear here.
-          </div>
-        )}
+      <div className="flex-grow bg-gray-900 border border-gray-700 rounded-md p-4 overflow-y-auto relative">
+        <div className="h-full">
+          {isLoading && !review && !error && <LoadingSkeleton />}
+          {error && <div className="text-red-400 p-4 bg-red-900/50 rounded-md">{error}</div>}
+          {review && <FormattedReview content={review} />}
+          {!isLoading && !error && !review && (
+            <div className="flex items-center justify-center h-full text-gray-500">
+              Your analysis report will appear here.
+            </div>
+          )}
+        </div>
       </div>
+       {isTruncated && !isLoading && (
+            <div className="mt-4 text-center">
+                <button
+                    onClick={onContinue}
+                    className="w-full inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-indigo-500 transition-all duration-200"
+                >
+                    Continue Generation
+                </button>
+            </div>
+        )}
     </div>
   );
 };
