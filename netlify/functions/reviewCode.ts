@@ -8,6 +8,8 @@ interface CodeFile {
   content: string;
 }
 
+const MAX_PROMPT_SIZE_BYTES = 500 * 1024; // 500 KB
+
 const getPrompt = (files: CodeFile[], language: Language): string => {
   const lang_prompt = language === 'es' ? 'español' : 'inglés';
 
@@ -38,7 +40,7 @@ ${codeBlocks}
 
 **Output Format:**
 
-Structure your response with the following Markdown headings. Use bullet points for lists. Use fenced code blocks for code examples.
+Structure your response with the following Markdown headings. Use bullet points for lists. Use fenced code blocks for code examples. Use **bold** for emphasis on keywords.
 
 ### Overall Score (out of 100)
 A single score reflecting overall compliance with the principles.
@@ -91,6 +93,14 @@ export default async (request: Request, context: Context) => {
         headers: { 'Content-Type': 'application/json' },
       });
     }
+
+    const totalSize = files.reduce((acc, file) => acc + (file.content?.length || 0), 0);
+    if (totalSize > MAX_PROMPT_SIZE_BYTES) {
+        return new Response(JSON.stringify({ error: `Total file size exceeds the limit of ${MAX_PROMPT_SIZE_BYTES / 1024}KB.` }), {
+            status: 413, // Payload Too Large
+            headers: { 'Content-Type': 'application/json' },
+        });
+    }
     
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
     const prompt = getPrompt(files, language);
@@ -105,12 +115,14 @@ export default async (request: Request, context: Context) => {
                 });
 
                 for await (const chunk of streamingResponse) {
-                    controller.enqueue(encoder.encode(chunk.text));
+                    if (chunk.text) {
+                        controller.enqueue(encoder.encode(chunk.text));
+                    }
                 }
                 controller.close();
             } catch (error) {
                  console.error("Error in stream generation:", error);
-                 const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+                 const errorMessage = error instanceof Error ? error.message : "An unknown error occurred during stream generation.";
                  const errorChunk = encoder.encode(`STREAM_ERROR: ${errorMessage}`);
                  controller.enqueue(errorChunk);
                  controller.close();

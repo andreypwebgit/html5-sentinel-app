@@ -1,3 +1,4 @@
+
 import type { Language, CodeFile } from '../types';
 
 interface StreamCallbacks {
@@ -16,8 +17,15 @@ export const reviewCodeStream = async (files: CodeFile[], language: Language, ca
         });
 
         if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(errorText || `Request failed with status ${response.status}`);
+            let errorText = `Request failed with status ${response.status}`;
+            try {
+                 const errorJson = await response.json();
+                 errorText = errorJson.error || errorText;
+            } catch(e) {
+                // Not a json error, use the status text
+                errorText = response.statusText || errorText;
+            }
+            throw new Error(errorText);
         }
 
         if (!response.body) {
@@ -32,7 +40,12 @@ export const reviewCodeStream = async (files: CodeFile[], language: Language, ca
             if (done) {
                 break;
             }
-            onChunk(decoder.decode(value, { stream: true }));
+            const chunk = decoder.decode(value, { stream: true });
+            if (chunk.startsWith('STREAM_ERROR:')) {
+                const errorMessage = chunk.substring('STREAM_ERROR:'.length);
+                throw new Error(errorMessage);
+            }
+            onChunk(chunk);
         }
     } catch (error) {
         console.error("Error calling review function:", error);

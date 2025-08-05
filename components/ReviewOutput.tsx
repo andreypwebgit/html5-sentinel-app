@@ -26,47 +26,64 @@ const LoadingSkeleton: React.FC = () => (
     </div>
 );
 
+const renderWithBold = (text: string, key: string) => {
+    const parts = text.split(/(\*\*.*?\*\*)/g);
+    return (
+        <React.Fragment key={key}>
+            {parts.map((part, i) => 
+                part.startsWith('**') && part.endsWith('**') ? (
+                    <strong key={i}>{part.slice(2, -2)}</strong>
+                ) : (
+                    part
+                )
+            )}
+        </React.Fragment>
+    );
+};
+
 const FormattedReview: React.FC<{ content: string }> = ({ content }) => {
-    const parts = content.split(/(```[\s\S]*?```)/g);
+    const blocks = content.split(/(```[\s\S]*?```|####\s.*|###\s.*)/g).filter(Boolean);
 
     return (
-        <div className="prose prose-invert prose-sm md:prose-base max-w-none text-gray-300">
-            {parts.map((part, index) => {
-                if (part.startsWith('```')) {
-                    const code = part.replace(/```/g, '').trim();
+        <div className="prose prose-invert prose-sm md:prose-base max-w-none text-gray-300 space-y-4">
+            {blocks.map((block, index) => {
+                const blockKey = `block-${index}`;
+                
+                if (block.startsWith('```')) {
+                    const code = block.replace(/```/g, '').trim();
                     return (
-                        <pre key={index} className="bg-gray-900/70 border border-gray-700 rounded-md p-4 text-sm overflow-x-auto">
+                        <pre key={blockKey} className="bg-gray-900/70 border border-gray-700 rounded-md p-4 text-sm overflow-x-auto">
                             <code>{code}</code>
                         </pre>
                     );
                 }
 
-                const lines = part.trim().split('\n');
-                let isList = false;
-                const elements: React.ReactNode[] = [];
-
-                for (let i = 0; i < lines.length; i++) {
-                    const line = lines[i].trim();
-                    if (line.startsWith('### ')) {
-                        elements.push(<h3 key={`${index}-${i}`} className="text-xl font-semibold text-white mt-6 mb-2 border-b border-gray-600 pb-1">{line.substring(4)}</h3>);
-                        isList = false;
-                    } else if (line.startsWith('#### ')) {
-                        elements.push(<h4 key={`${index}-${i}`} className="text-lg font-semibold text-indigo-400 mt-4 mb-1">{line.substring(5)}</h4>);
-                        isList = false;
-                    } else if (line.startsWith('- ') || line.startsWith('* ')) {
-                        if (!isList) {
-                            elements.push(<ul key={`${index}-${i}-ul`} className="list-disc pl-5 space-y-1"></ul>);
-                            isList = true;
-                        }
-                        const listContainer = elements[elements.length - 1] as React.ReactElement;
-                        const newChildren = [...React.Children.toArray(listContainer.props.children), <li key={`${index}-${i}`}>{line.substring(2)}</li>];
-                        elements[elements.length - 1] = React.cloneElement(listContainer, {}, newChildren);
-                    } else if (line) {
-                        elements.push(<p key={`${index}-${i}`}>{line}</p>);
-                        isList = false;
-                    }
+                if (block.startsWith('### ')) {
+                    return <h3 key={blockKey} className="text-xl font-semibold text-white mt-6 mb-2 border-b border-gray-600 pb-1">{renderWithBold(block.substring(4),'h3')}</h3>;
                 }
-                return <React.Fragment key={index}>{elements}</React.Fragment>;
+
+                if (block.startsWith('#### ')) {
+                    return <h4 key={blockKey} className="text-lg font-semibold text-indigo-400 mt-4 mb-1">{renderWithBold(block.substring(5), 'h4')}</h4>;
+                }
+
+                const lines = block.trim().split('\n').filter(line => line.trim() !== '');
+                if (lines.some(line => line.trim().startsWith('* ') || line.trim().startsWith('- '))) {
+                     return (
+                        <ul key={blockKey} className="list-disc space-y-1 pl-5">
+                            {lines.map((line, lineIndex) => (
+                                <li key={lineIndex}>{renderWithBold(line.trim().substring(2), `li-${lineIndex}`)}</li>
+                            ))}
+                        </ul>
+                    );
+                }
+                
+                return (
+                    <div key={blockKey}>
+                        {lines.map((line, pIndex) => (
+                             <p key={pIndex}>{renderWithBold(line, `p-${pIndex}`)}</p>
+                        ))}
+                    </div>
+                );
             })}
         </div>
     );
