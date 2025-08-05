@@ -56,9 +56,9 @@ export const ReviewOutput: React.FC<ReviewOutputProps> = ({ review, isLoading, e
     <div className="bg-gray-800 rounded-lg shadow-lg p-6 flex flex-col h-full">
       <h2 className="text-xl font-bold text-white mb-4">{text.reviewTitle}</h2>
       <div className="flex-grow bg-gray-900 border border-gray-700 rounded-md p-4 overflow-y-auto">
-        {isLoading && <LoadingSkeleton />}
+        {isLoading && !review && !error && <LoadingSkeleton />}
         {error && <div className="text-red-400 p-4 bg-red-900/50 rounded-md">{error}</div>}
-        {!isLoading && !error && review && <FormattedReview content={review} />}
+        {review && <FormattedReview content={review} />}
         {!isLoading && !error && !review && (
           <div className="flex items-center justify-center h-full text-gray-500">
             Your analysis report will appear here.

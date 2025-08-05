@@ -1,5 +1,6 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
-import type { Handler, HandlerEvent } from "@netlify/functions";
+
+import { GoogleGenAI } from "@google/genai";
+import type { HandlerEvent } from "@netlify/functions";
 
 type Language = 'en' | 'es';
 interface CodeFile {
@@ -65,57 +66,70 @@ If applicable, suggest how client-side AI could be compliantly and performantly 
 `;
 };
 
-const handler: Handler = async (event: HandlerEvent) => {
+const handler = async (event: HandlerEvent) => {
   if (event.httpMethod !== 'POST') {
-    return {
-      statusCode: 405,
-      body: JSON.stringify({ error: 'Method Not Allowed' }),
-    };
+    return new Response(JSON.stringify({ error: 'Method Not Allowed' }), {
+      status: 405,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  
+  if (!process.env.API_KEY) {
+      console.error("API_KEY environment variable not set in Netlify.");
+      return new Response(JSON.stringify({ error: "Server configuration error. The API key is missing." }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' },
+      });
   }
 
   try {
     const { files, language } = JSON.parse(event.body || '{}');
 
     if (!files || !Array.isArray(files) || files.length === 0 || !language) {
-      return {
-        statusCode: 400,
-        body: JSON.stringify({ error: 'Missing files or language in request body.' }),
-      };
+       return new Response(JSON.stringify({ error: 'Missing files or language in request body.' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
     }
     
-    if (!process.env.GEMINI_API_KEY) {
-        console.error("GEMINI_API_KEY environment variable not set in Netlify.");
-        return {
-            statusCode: 500,
-            body: JSON.stringify({ error: "Server configuration error. The API key is missing." }),
-        };
-    }
-
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const prompt = getPrompt(files, language);
 
-    // 1. Selecciona el modelo
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    const stream = new ReadableStream({
+        async start(controller) {
+            const encoder = new TextEncoder();
+            try {
+                const streamingResponse = await ai.models.generateContentStream({
+                    model: 'gemini-2.5-flash',
+                    contents: prompt,
+                });
 
-    // 2. Llama a la API usando el 'model' y el 'prompt'
-    const result = await model.generateContent(prompt);
-    const response = result.response;
-    const reviewText = response.text();
-
-    // 3. Devuelve el texto en el body de la respuesta
-    return {
-      statusCode: 200,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ review: reviewText }),
-    };
+                for await (const chunk of streamingResponse) {
+                    controller.enqueue(encoder.encode(chunk.text));
+                }
+                controller.close();
+            } catch (error) {
+                 console.error("Error in stream generation:", error);
+                 const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+                 const errorChunk = encoder.encode(`STREAM_ERROR: ${errorMessage}`);
+                 controller.enqueue(errorChunk);
+                 controller.close();
+            }
+        },
+    });
+    
+    return new Response(stream, {
+        status: 200,
+        headers: { "Content-Type": "text/plain; charset=utf-8" },
+    });
 
   } catch (error) {
-    console.error("Error in Netlify function:", error);
+    console.error("Error in Netlify function (pre-stream):", error);
     const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: `An internal error occurred: ${errorMessage}` }),
-    };
+    return new Response(JSON.stringify({ error: `An internal error occurred: ${errorMessage}` }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
 };
 

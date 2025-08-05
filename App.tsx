@@ -3,7 +3,7 @@ import { Header } from './components/Header';
 import { CodeInput } from './components/CodeInput';
 import { ReviewOutput } from './components/ReviewOutput';
 import { Footer } from './components/Footer';
-import { reviewCode } from './services/geminiService';
+import { reviewCodeStream } from './services/geminiService';
 import type { Language, CodeFile } from './types';
 import { UI_TEXT } from './constants';
 
@@ -26,23 +26,18 @@ export default function App() {
     setError(null);
     setReview('');
 
-    try {
-      const result = await reviewCode(files, language);
-      if (result.startsWith('Error')) {
-         setError(result);
-      } else {
-        setReview(result);
-      }
-    } catch (e) {
-      if (e instanceof Error) {
-        setError(`${text.errorTitle}: ${e.message}`);
-      } else {
-        setError(text.errorTitle);
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  }, [files, language, isLoading, text.errorTitle]);
+    await reviewCodeStream(files, language, {
+        onChunk: (chunk) => {
+            setReview(prev => prev + chunk);
+        },
+        onError: (err) => {
+            setError(err.message);
+        },
+        onFinish: () => {
+            setIsLoading(false);
+        },
+    });
+  }, [files, language, isLoading]);
   
   return (
     <div className="min-h-screen flex flex-col font-sans bg-gray-900 text-gray-100">
