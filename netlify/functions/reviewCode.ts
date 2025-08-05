@@ -1,26 +1,33 @@
-// Archivo: reviewCode.ts
-
-// Importación corregida desde el paquete oficial
-import { GoogleGenerativeAI } from "@google/generative-ai"; 
+import { GoogleGenAI } from "@google/genai";
 import type { Handler, HandlerEvent } from "@netlify/functions";
 
 type Language = 'en' | 'es';
+interface CodeFile {
+  name: string;
+  content: string;
+}
 
-// Tu función getPrompt() se mantiene exactamente igual...
-const getPrompt = (code: string, language: Language): string => {
+const getPrompt = (files: CodeFile[], language: Language): string => {
   const lang_prompt = language === 'es' ? 'español' : 'inglés';
+
+  const codeBlocks = files.map(file => `
+---
+**File: \`${file.name}\`**
+\`\`\`
+${file.content}
+\`\`\`
+---
+`).join('\n\n');
   
   return `
 You are an expert code reviewer named 'HTML5 Sentinel'. Your sole purpose is to enforce the principles of zero-dependency, high-performance, secure, and SEO-optimized pure HTML5 development. You are bilingual in English and Spanish. Your feedback is direct, actionable, and structured.
 
-Review the following code. Provide your analysis in structured Markdown format. The entire response MUST be in ${lang_prompt}.
+Review the following files as a cohesive project. Provide your analysis in structured Markdown format. The entire response MUST be in ${lang_prompt}.
 
-**Code to Review:**
-\`\`\`
-${code}
-\`\`\`
+**Files to Review:**
+${codeBlocks}
 
-**Review Guidelines:**
+**Review Guidelines (analyze files holistically):**
 
 1.  **Zero-Dependency Rule:** Identify any external CSS or JS frameworks/libraries. Strongly advocate for their removal and replacement with pure HTML5, CSS, and vanilla JavaScript solutions.
 2.  **Performance Rule (Target: PageSpeed ≥95):** Analyze for performance bottlenecks. Suggest optimizations for image loading (e.g., \`loading="lazy"\`), asset delivery, DOM size, and render-blocking resources. Be specific.
@@ -58,7 +65,6 @@ If applicable, suggest how client-side AI could be compliantly and performantly 
 `;
 };
 
-
 const handler: Handler = async (event: HandlerEvent) => {
   if (event.httpMethod !== 'POST') {
     return {
@@ -68,37 +74,35 @@ const handler: Handler = async (event: HandlerEvent) => {
   }
 
   try {
-    const { code, language } = JSON.parse(event.body || '{}');
+    const { files, language } = JSON.parse(event.body || '{}');
 
-    if (!code || !language) {
+    if (!files || !Array.isArray(files) || files.length === 0 || !language) {
       return {
         statusCode: 400,
-        body: JSON.stringify({ error: 'Missing code or language in request body.' }),
+        body: JSON.stringify({ error: 'Missing files or language in request body.' }),
       };
     }
     
-    // CORRECCIÓN 2: El nombre de la variable de entorno debe coincidir
-    // con la que configuras en Netlify. Usaré GEMINI_API_KEY para ser consistente.
-    if (!process.env.GEMINI_API_KEY) {
-        console.error("GEMINI_API_KEY environment variable not set in Netlify.");
+    if (!process.env.API_KEY) {
+        console.error("API_KEY environment variable not set in Netlify.");
         return {
             statusCode: 500,
             body: JSON.stringify({ error: "Server configuration error. The API key is missing." }),
         };
     }
 
-    // CORRECCIÓN 3: Uso correcto del SDK
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" }); // Nombre del modelo corregido
-    const prompt = getPrompt(code, language as Language);
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const prompt = getPrompt(files, language);
 
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: prompt,
+    });
 
     return {
       statusCode: 200,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ review: response.text() }), // Llamada a .text()
+      body: JSON.stringify({ review: response.text }),
     };
 
   } catch (error) {

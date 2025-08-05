@@ -1,13 +1,13 @@
-import type { Language } from '../types';
+import type { Language, CodeFile } from '../types';
 
-export const reviewCode = async (code: string, language: Language): Promise<string> => {
+export const reviewCode = async (files: CodeFile[], language: Language): Promise<string> => {
   try {
     const response = await fetch('/.netlify/functions/reviewCode', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ code, language }),
+      body: JSON.stringify({ files, language }),
     });
 
     const data = await response.json();
@@ -20,7 +20,6 @@ export const reviewCode = async (code: string, language: Language): Promise<stri
   } catch (error) {
     console.error("Error calling review function:", error);
     if (error instanceof Error) {
-        // The error message from the server is already user-friendly.
         return `Error during analysis: ${error.message}`;
     }
     return "An unknown error occurred during analysis.";
