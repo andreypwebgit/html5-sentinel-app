@@ -83,10 +83,11 @@ export default function App() {
                 setIsLoading(false);
                 setIsTruncated(truncated);
                 const userPrompt = getInitialUserPrompt(files, language);
-                setHistory([
+                const newHistory: ChatContent[] = [
                     { role: 'user', parts: [{ text: userPrompt }] },
                     { role: 'model', parts: [{ text: reviewRef.current }] },
-                ]);
+                ];
+                setHistory(newHistory);
             },
         }
     });
@@ -99,18 +100,18 @@ export default function App() {
     setError(null);
     setIsTruncated(false);
 
-    const continueHistory = [
+    const continueHistory: ChatContent[] = [
         ...history,
         { role: 'user', parts: [{ text: 'Please continue generating the response from exactly where you left off. Do not repeat anything or add conversational filler.' }] }
-    ] as ChatContent[];
+    ];
 
-    reviewRef.current = ''; // Reset for the new chunk
+    const newContentRef = useRef('');
 
     await reviewCodeStream({
         history: continueHistory,
         callbacks: {
             onChunk: (chunk) => {
-                reviewRef.current += chunk;
+                newContentRef.current += chunk;
                 setReview(prev => prev + chunk);
             },
             onError: (err) => {
@@ -120,13 +121,12 @@ export default function App() {
                 setIsLoading(false);
                 setIsTruncated(truncated);
 
-                // Append the new text to the last model message in history
-                const newHistory = [...continueHistory];
-                const lastModelMessage = newHistory.find(m => m.role === 'model');
-                if (lastModelMessage) {
-                    lastModelMessage.parts[0].text += reviewRef.current;
-                }
-                setHistory(newHistory);
+                // Correctly append the new model response to the history
+                const finalHistory: ChatContent[] = [
+                    ...continueHistory,
+                    { role: 'model', parts: [{ text: newContentRef.current }] }
+                ];
+                setHistory(finalHistory);
             }
         }
     });

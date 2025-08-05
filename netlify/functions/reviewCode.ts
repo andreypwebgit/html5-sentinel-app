@@ -72,7 +72,7 @@ export default async (request: Request, context: Context) => {
     }
     
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-    const chat = ai.chats.create({ model: 'gemini-2.5-pro', history: chatHistory });
+    const chat = ai.chats.create({ model: 'gemini-2.5-flash', history: chatHistory });
 
     const stream = new ReadableStream({
         async start(controller) {
