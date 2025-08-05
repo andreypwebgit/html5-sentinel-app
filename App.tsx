@@ -82,13 +82,10 @@ export default function App() {
                 setIsLoading(false);
                 setIsTruncated(truncated);
                 
-                const finalModelResponse = reviewRef.current.replace('__STREAM_TRUNCATED__', '');
-                setReview(finalModelResponse);
-
                 const userPrompt = getInitialUserPrompt(files, language);
                 const newHistory: ChatContent[] = [
                     { role: 'user', parts: [{ text: userPrompt }] },
-                    { role: 'model', parts: [{ text: finalModelResponse }] },
+                    { role: 'model', parts: [{ text: reviewRef.current }] },
                 ];
                 setHistory(newHistory);
             },
@@ -125,10 +122,6 @@ export default function App() {
                 setIsLoading(false);
                 setIsTruncated(truncated);
                 
-                const cleanedNewContent = newContentRef.current.replace('__STREAM_TRUNCATED__', '');
-
-                setReview(prev => prev.replace('__STREAM_TRUNCATED__', ''));
-                
                 const updatedHistory = [...history];
                 
                 let lastModelMessageIndex = -1;
@@ -143,7 +136,7 @@ export default function App() {
                     const originalModelMessage = updatedHistory[lastModelMessageIndex].parts[0].text;
                     updatedHistory[lastModelMessageIndex] = {
                         role: 'model',
-                        parts: [{ text: originalModelMessage + cleanedNewContent }]
+                        parts: [{ text: originalModelMessage + newContentRef.current }]
                     };
                     setHistory(updatedHistory);
                 }

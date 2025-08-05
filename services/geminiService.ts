@@ -34,50 +34,53 @@ export const reviewCodeStream = async (options: ReviewStreamOptions): Promise<vo
         });
 
         if (!response.ok) {
-            let errorText = `Request failed with status ${response.status}`;
-            try {
-                const errorJson = await response.json();
-                errorText = errorJson.error || errorText;
-            } catch (e) {
-                // Ignore if response is not JSON
-                errorText = response.statusText || errorText;
-            }
-            throw new Error(errorText);
+            const errorData = await response.json().catch(() => ({ error: `Request failed with status ${response.status}` }));
+            throw new Error(errorData.error || 'Unknown server error');
         }
 
-        if (!response.body) {
-            throw new Error("Response body is empty.");
+        const reader = response.body?.getReader();
+        if (!reader) {
+            throw new Error('Failed to get stream reader.');
         }
 
-        const reader = response.body.getReader();
         const decoder = new TextDecoder();
-        let fullResponseText = '';
+        let isTruncated = false;
+        const truncationMarker = '__STREAM_TRUNCATED__';
+        const errorMarker = 'STREAM_ERROR: ';
 
         while (true) {
             const { done, value } = await reader.read();
             if (done) {
                 break;
             }
-            const chunk = decoder.decode(value, { stream: true });
-            onChunk(chunk); // Stream to UI immediately for a live experience
-            fullResponseText += chunk; // Accumulate the full response in the background
+
+            let chunkText = decoder.decode(value, { stream: true });
+
+            // Handle in-stream errors sent from the serverless function
+            if (chunkText.startsWith(errorMarker)) {
+                const errorMessage = chunkText.substring(errorMarker.length);
+                onError(new Error(errorMessage));
+                reader.cancel(); // Stop reading from the stream
+                return; // Exit the function
+            }
+
+            // Check for the truncation marker. It's sent at the very end.
+            if (chunkText.includes(truncationMarker)) {
+                isTruncated = true;
+                // Remove the marker so it's not displayed
+                chunkText = chunkText.replace(truncationMarker, '');
+            }
+
+            if (chunkText) {
+                onChunk(chunkText);
+            }
         }
 
-        const truncationMarker = '__STREAM_TRUNCATED__';
-        const isTruncated = fullResponseText.includes(truncationMarker);
-        
-        // Let the App component handle cleaning the marker from its state.
-        // We just report whether the marker was found or not.
         onFinish(isTruncated);
 
     } catch (error) {
-        console.error("Error calling review function:", error);
-        if (error instanceof Error) {
-            onError(new Error(`Error during analysis: ${error.message}`));
-        } else {
-            onError(new Error("An unknown error occurred during analysis."));
-        }
-        // Ensure onFinish is always called to reset loading state etc.
-        onFinish(false);
+        const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
+        onError(new Error(errorMessage));
+        onFinish(false); // Ensure onFinish is always called
     }
 };
