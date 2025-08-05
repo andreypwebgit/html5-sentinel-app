@@ -1,0 +1,9 @@
+{
+  "name": "html5-sentinel-proxy",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "@google/genai": "^1.12.0",
+    "@netlify/functions": "^4.2.1"
+  }
+}
