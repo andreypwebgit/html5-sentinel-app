@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import type { Handler, HandlerEvent } from "@netlify/functions";
 
 type Language = 'en' | 'es';
@@ -91,18 +91,22 @@ const handler: Handler = async (event: HandlerEvent) => {
         };
     }
 
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     const prompt = getPrompt(files, language);
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: prompt,
-    });
+    // 1. Selecciona el modelo
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
+    // 2. Llama a la API usando el 'model' y el 'prompt'
+    const result = await model.generateContent(prompt);
+    const response = result.response;
+    const reviewText = response.text();
+
+    // 3. Devuelve el texto en el body de la respuesta
     return {
       statusCode: 200,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ review: response.text }),
+      body: JSON.stringify({ review: reviewText }),
     };
 
   } catch (error) {
